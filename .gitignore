@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Account credentials and authenticated browser state must stay local.
+accounts.json
+proxies.json
+data/

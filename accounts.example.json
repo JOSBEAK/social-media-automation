@@ -1,0 +1,13 @@
+[
+  {
+    "username": "instagram_username",
+    "password": "replace-me",
+    "platform": "instagram"
+  },
+  {
+    "username": "x_username",
+    "password": "replace-me",
+    "platform": "twitter",
+    "verification_identifier": "email-or-phone-if-x-asks"
+  }
+]
