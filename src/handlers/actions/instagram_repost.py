@@ -24,12 +24,12 @@ class InstagramRepostHandler(InstagramActionMixin, IActionHandler):
     def execute(self, driver, task: Task) -> bool | ActionResult:
         try:
             session_failure = self.require_session(driver)
-            if session_failure is not None:
+            if session_failure:
                 return session_failure
             driver.get(task.target_url)
             time.sleep(random.uniform(2, 4))
             session_failure = self.require_session(driver)
-            if session_failure is not None:
+            if session_failure:
                 return session_failure
             
             share_btn = WebDriverWait(driver, 5).until(

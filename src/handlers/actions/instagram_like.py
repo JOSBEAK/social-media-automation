@@ -33,12 +33,12 @@ class InstagramLikeHandler(InstagramActionMixin, IActionHandler):
     def execute(self, driver, task: Task) -> ActionResult:
         try:
             session_failure = self.require_session(driver)
-            if session_failure is not None:
+            if session_failure:
                 return session_failure
             driver.get(task.target_url)
             time.sleep(random.uniform(2, 3))
             session_failure = self.require_session(driver)
-            if session_failure is not None:
+            if session_failure:
                 return session_failure
 
             if driver.find_elements(By.XPATH, "//*[local-name()='svg'][@aria-label='Unlike']"):
