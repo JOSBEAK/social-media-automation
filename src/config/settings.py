@@ -19,6 +19,12 @@ class Settings:
     MIN_COOLDOWN = max(0.0, float(os.getenv("SOCIAL_MIN_COOLDOWN", "0")))
     MAX_COOLDOWN = max(MIN_COOLDOWN, float(os.getenv("SOCIAL_MAX_COOLDOWN", "0")))
     HEADLESS = _env_bool("SOCIAL_HEADLESS", False)
+    IMPLICIT_WAIT = max(0.0, float(os.getenv("SOCIAL_IMPLICIT_WAIT", "10")))
+    LOGIN_TYPING_MIN = max(0.0, float(os.getenv("SOCIAL_LOGIN_TYPING_MIN", "0.05")))
+    LOGIN_TYPING_MAX = max(
+        LOGIN_TYPING_MIN, float(os.getenv("SOCIAL_LOGIN_TYPING_MAX", "0.15"))
+    )
+    LOGIN_SETTLE_SECONDS = max(0.0, float(os.getenv("SOCIAL_LOGIN_SETTLE_SECONDS", "6")))
     JOB_WORKERS = max(1, int(os.getenv("SOCIAL_JOB_WORKERS", "1")))
     JOB_POLL_INTERVAL = max(0.1, float(os.getenv("SOCIAL_JOB_POLL_INTERVAL", "0.5")))
     MAX_CSV_BYTES = max(1024, int(os.getenv("SOCIAL_MAX_CSV_BYTES", str(5 * 1024 * 1024))))

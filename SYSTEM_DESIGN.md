@@ -665,6 +665,10 @@ All runtime controls are environment-based.
 | `SOCIAL_MIN_COOLDOWN` | `0` | Minimum same-account cooldown |
 | `SOCIAL_MAX_COOLDOWN` | `0` | Maximum same-account cooldown |
 | `SOCIAL_HEADLESS` | `false` | Run Chrome without a visible window |
+| `SOCIAL_IMPLICIT_WAIT` | `10` | Selenium implicit element wait in seconds |
+| `SOCIAL_LOGIN_TYPING_MIN` | `0.05` | Minimum delay between login keystrokes |
+| `SOCIAL_LOGIN_TYPING_MAX` | `0.15` | Maximum delay between login keystrokes |
+| `SOCIAL_LOGIN_SETTLE_SECONDS` | `6` | Wait after submitting login credentials |
 | `SOCIAL_JOB_POLL_INTERVAL` | `0.5` | Dispatcher polling interval |
 | `SOCIAL_MAX_CSV_BYTES` | `5242880` | Maximum CSV upload size |
 | `SOCIAL_MAX_ACCOUNTS_PER_BATCH` | `10000` | Maximum accounts in one batch |

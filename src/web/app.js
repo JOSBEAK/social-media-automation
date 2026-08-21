@@ -77,8 +77,8 @@ function renderJobs(jobs) {
     const percent = job.total ? Math.round((job.completed / job.total) * 100) : 0;
     const created = new Date(job.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
     const result = job.status === "failed" ? escapeHtml(job.error || "Job failed") : `${job.succeeded} passed · ${job.failed} failed`;
-    return `<tr>
-      <td><span class="job-id">${job.id.slice(0, 8)}</span><br><strong>${escapeHtml(job.action)}</strong></td>
+    return `<tr class="job-row" data-job-id="${job.id}" tabindex="0">
+      <td><span class="job-id">${job.id.slice(0, 8)}</span><br><strong>${escapeHtml(job.action)}</strong><br><button class="job-open" type="button">View logs</button></td>
       <td>${job.platform === "twitter" ? "X / Twitter" : "Instagram"}</td>
       <td>${escapeHtml(job.batch_name)}</td>
       <td><div class="progress"><i style="width:${percent}%"></i></div><span class="progress-label">${job.completed} of ${job.total}</span></td>
@@ -86,6 +86,49 @@ function renderJobs(jobs) {
       <td>${created}</td>
     </tr>`;
   }).join("");
+  body.querySelectorAll(".job-row").forEach(row => {
+    row.addEventListener("click", () => openJobDetails(row.dataset.jobId));
+    row.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openJobDetails(row.dataset.jobId);
+      }
+    });
+  });
+}
+
+async function openJobDetails(jobId) {
+  const panel = document.querySelector("#job-details");
+  const title = document.querySelector("#job-details-title");
+  const meta = document.querySelector("#job-details-meta");
+  const results = document.querySelector("#job-results");
+  panel.classList.remove("hidden");
+  title.textContent = `Job ${jobId.slice(0, 8)}`;
+  meta.textContent = "Loading task logs…";
+  results.innerHTML = "";
+  try {
+    const job = await api(`/api/v1/jobs/${jobId}`);
+    meta.innerHTML = `
+      <span><strong>Status:</strong> ${escapeHtml(job.status)}</span>
+      <span><strong>Platform:</strong> ${escapeHtml(job.platform)}</span>
+      <span><strong>Action:</strong> ${escapeHtml(job.action)}</span>
+      <span><strong>Batch:</strong> ${escapeHtml(job.batch_name)}</span>
+      <span><strong>Target:</strong> ${escapeHtml(job.target_url)}</span>`;
+    const jobError = job.error ? `<pre class="job-level-error">${escapeHtml(job.error)}</pre>` : "";
+    const taskResults = job.results.length ? job.results.map(result => `
+      <article class="result-item">
+        <header>
+          <strong>${escapeHtml(result.username)}</strong>
+          <span class="result-code ${result.code === "success" ? "success" : "failure"}">${escapeHtml(result.code)} · attempt ${result.attempts}</span>
+        </header>
+        ${result.error ? `<pre>${escapeHtml(result.error)}</pre>` : ""}
+      </article>`).join("") : '<div class="empty-results">No account results have been recorded yet.</div>';
+    results.innerHTML = jobError + taskResults;
+    panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (error) {
+    meta.textContent = "Unable to load job details";
+    results.innerHTML = `<pre class="job-level-error">${escapeHtml(error.message)}</pre>`;
+  }
 }
 
 async function loadJobs() {
@@ -165,6 +208,9 @@ document.querySelector("#download-template").addEventListener("click", () => {
   URL.revokeObjectURL(link.href);
 });
 document.querySelector("#refresh-jobs").addEventListener("click", () => Promise.all([loadJobs(), loadStats()]));
+document.querySelector("#close-job-details").addEventListener("click", () => {
+  document.querySelector("#job-details").classList.add("hidden");
+});
 
 Promise.all([loadBatches("instagram"), loadBatches("twitter"), loadJobs(), loadStats()])
   .catch(error => toast(error.message, true));

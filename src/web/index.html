@@ -131,6 +131,17 @@
             <tbody id="jobs-body"><tr><td class="empty-row" colspan="6">No jobs yet. Your first queued job will appear here.</td></tr></tbody>
           </table>
         </div>
+        <section class="job-details hidden" id="job-details" aria-live="polite">
+          <header>
+            <div>
+              <p class="eyebrow">JOB DETAILS</p>
+              <h3 id="job-details-title">Task logs</h3>
+            </div>
+            <button class="inline-button" id="close-job-details" type="button">Close</button>
+          </header>
+          <div class="job-details-meta" id="job-details-meta"></div>
+          <div class="result-list" id="job-results"></div>
+        </section>
       </section>
     </main>
 

@@ -4,10 +4,11 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from src.domains.platform import Platform
 from src.domains.action_type import ActionType
 from src.domains.task import Task
+from src.domains.action_result import ActionResult
 
 class IActionHandler(ABC):
     @abstractmethod
-    def execute(self, driver: WebDriver, task: Task) -> bool:
+    def execute(self, driver: WebDriver, task: Task) -> bool | ActionResult:
         pass
 
     @property

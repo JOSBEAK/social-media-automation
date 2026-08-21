@@ -17,8 +17,15 @@ class ConsoleExecutionObserver:
         print(
             f"[Executor] Progress: {completed}/{total} | {marker} "
             f"{result.task.platform.value}:{result.task.account.username} "
-            f"{result.code.value}{detail}"
+            f"{result.code.value}{detail}",
+            flush=True,
         )
+        if not result.success and result.error:
+            print(
+                f"[TaskError] {result.task.platform.value}:{result.task.account.username} "
+                f"{result.task.action.value}\n{result.error.rstrip()}",
+                flush=True,
+            )
 
     def on_completed(self, summary: ExecutionSummary) -> None:
         print("\n" + "=" * 60)

@@ -7,6 +7,7 @@ from src.domains.action_type import ActionType
 from src.domains.platform import Platform
 from src.domains.task import Task
 from src.services.job_store import JobRecord, JobStore
+from src.services.execution_observer import ConsoleExecutionObserver
 
 
 class JobProgressObserver:
@@ -80,6 +81,11 @@ class JobDispatcher:
             self._execute(job)
 
     def _execute(self, job: JobRecord) -> None:
+        print(
+            f"[JobDispatcher] Starting job {job.id[:8]} | {job.platform}/{job.action} | "
+            f"batch={job.batch_name} | accounts={job.total}",
+            flush=True,
+        )
         try:
             accounts = self.store.load_accounts(job.batch_id)
             platform = Platform.parse(job.platform)
@@ -94,8 +100,18 @@ class JobDispatcher:
                 )
                 for account in accounts
             ]
-            observer = JobProgressObserver(self.store, job.id)
-            self.executor_factory(tasks, (observer,)).run()
+            observers = (JobProgressObserver(self.store, job.id), ConsoleExecutionObserver())
+            self.executor_factory(tasks, observers).run()
             self.store.complete_job(job.id)
+            completed_job = self.store.get_job(job.id)
+            print(
+                f"[JobDispatcher] Finished job {job.id[:8]} | status={completed_job.status} | "
+                f"success={completed_job.succeeded} | failed={completed_job.failed}",
+                flush=True,
+            )
         except Exception as exc:
             self.store.fail_job(job.id, f"{type(exc).__name__}: {exc}")
+            print(
+                f"[JobDispatcher] Job {job.id[:8]} crashed | {type(exc).__name__}: {exc}",
+                flush=True,
+            )

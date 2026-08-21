@@ -39,19 +39,22 @@ class Worker:
             driver = None
             try:
                 driver = self.browser_factory.create_driver(proxy=self.proxy_manager.get_next())
-                if not platform_handler.login(driver, task.account):
-                    last_error = "login failed"
+                authentication = platform_handler.login(driver, task.account)
+                if not authentication:
+                    last_error = getattr(authentication, "error", None) or "login failed"
                     if attempt <= self.settings.MAX_RETRIES:
                         time.sleep(self.settings.RETRY_DELAY * attempt)
                         continue
                     return ExecutionResult(task, ResultCode.LOGIN_FAILED, attempt, last_error)
 
-                if action_handler.execute(driver, task):
+                action_execution = action_handler.execute(driver, task)
+                if action_execution:
                     return ExecutionResult(task, ResultCode.SUCCESS, attempt)
 
                 # Avoid blindly retrying a write: the click may have succeeded even
                 # if its confirmation selector timed out.
-                return ExecutionResult(task, ResultCode.ACTION_FAILED, attempt, "action failed")
+                action_error = getattr(action_execution, "error", None) or "action failed"
+                return ExecutionResult(task, ResultCode.ACTION_FAILED, attempt, action_error)
             except Exception:
                 last_error = traceback.format_exc(limit=8)
                 if attempt <= self.settings.MAX_RETRIES:

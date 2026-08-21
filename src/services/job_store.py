@@ -115,6 +115,14 @@ class JobStore:
                 );
                 """
             )
+            connection.execute(
+                """
+                UPDATE jobs
+                SET status = 'failed',
+                    error = failed || ' of ' || total || ' account tasks failed'
+                WHERE status = 'completed' AND failed > 0
+                """
+            )
             connection.commit()
 
     def create_batch(
@@ -277,7 +285,16 @@ class JobStore:
     def complete_job(self, job_id: str) -> None:
         with self._connect() as connection:
             connection.execute(
-                "UPDATE jobs SET status = 'completed', completed_at = ? WHERE id = ?",
+                """
+                UPDATE jobs
+                SET status = CASE WHEN failed > 0 THEN 'failed' ELSE 'completed' END,
+                    error = CASE
+                        WHEN failed > 0 THEN failed || ' of ' || total || ' account tasks failed'
+                        ELSE NULL
+                    END,
+                    completed_at = ?
+                WHERE id = ?
+                """,
                 (utc_now(), job_id),
             )
             connection.commit()

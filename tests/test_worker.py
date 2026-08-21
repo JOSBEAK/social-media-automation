@@ -3,6 +3,7 @@ import unittest
 from src.core.registry import Registry
 from src.core.worker import Worker
 from src.domains.action_type import ActionType
+from src.domains.action_result import ActionResult
 from src.domains.execution_result import ResultCode
 from src.domains.platform import Platform
 from src.domains.task import Task
@@ -104,6 +105,14 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(result.code, ResultCode.ACTION_FAILED)
         self.assertEqual(action.calls, 1)
         self.assertEqual(len(FakeBrowserFactory.drivers), 1)
+
+    def test_preserves_structured_action_failure_reason(self):
+        platform = FakePlatform([True])
+        action = FakeAction(ActionResult(False, "session cookie missing"))
+        result = self.make_worker(platform, action).execute(make_task())
+
+        self.assertEqual(result.code, ResultCode.ACTION_FAILED)
+        self.assertEqual(result.error, "session cookie missing")
 
 
 if __name__ == "__main__":

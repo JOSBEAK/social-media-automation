@@ -82,6 +82,14 @@ are accepted as aliases for `twitter` in account/task data. X may require
 `verification_identifier` during login. CAPTCHA, MFA, account locks, and UI changes
 still require human intervention.
 
+Instagram login uses the validated DOM sequence from the working reference project:
+multiple username/password/button selectors, human-paced typing, submit-form fallback,
+and completion of the post-login `accounts/onetap` screen. Login is accepted only when
+Instagram issues a `sessionid` cookie; the cookie is checked again after opening the
+target post. A like is reported successful only after the control changes to `Unlike`.
+If Instagram still blocks an account, open **View logs** for the job; challenge/2FA,
+rejected credentials, missing sessions, and login-page timeouts are reported separately.
+
 ## Scale controls
 
 Configuration is environment-based:
