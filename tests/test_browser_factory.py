@@ -17,5 +17,23 @@ class BrowserFactoryTests(unittest.TestCase):
         )
 
 
+    def test_multithreaded_context_creation(self):
+        """Verify contexts can be created and closed across multiple concurrent threads."""
+        import concurrent.futures
+
+        def worker_fn():
+            context, page = BrowserFactory.create_context(headless=True)
+            page.goto("about:blank")
+            context.close()
+            return True
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+            futures = [pool.submit(worker_fn) for _ in range(3)]
+            results = [f.result() for f in futures]
+            self.assertTrue(all(results))
+
+        BrowserFactory.shutdown()
+
+
 if __name__ == "__main__":
     unittest.main()

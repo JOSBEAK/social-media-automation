@@ -1,6 +1,6 @@
 # src/services/browser_factory.py
 import threading
-from typing import Optional
+from typing import Optional, List, Tuple
 
 from playwright.sync_api import sync_playwright, Playwright, Browser, BrowserContext, Page
 
@@ -8,38 +8,41 @@ from src.config.settings import Settings
 
 
 class BrowserFactory:
-    """Manages a shared Playwright instance and Chromium browser.
+    """Manages thread-local Playwright instances and Chromium browsers.
+
+    Each worker thread maintains its own thread-local Playwright and Browser instance,
+    ensuring thread-safety and preventing greenlet thread-switch errors in multi-threaded
+    executors.
 
     Each call to ``create_context`` returns an isolated ``BrowserContext`` with
-    its own cookies, storage, and a single ``Page``.  Workers must close the
+    its own cookies, storage, and a single ``Page``. Workers must close the
     context when finished (the ``Worker`` does this in its ``finally`` block).
-
-    The first call lazily starts the Playwright process and launches the shared
-    browser.  A threading lock prevents races when multiple worker threads
-    start simultaneously.
     """
 
-    _playwright: Optional[Playwright] = None
-    _browser: Optional[Browser] = None
+    _local = threading.local()
+    _instances: List[Tuple[Playwright, Browser]] = []
     _lock = threading.Lock()
 
     @classmethod
     def _ensure_browser(cls, headless: Optional[bool] = None) -> Browser:
-        if cls._browser is None or not cls._browser.is_connected():
+        browser = getattr(cls._local, "browser", None)
+        if browser is None or not browser.is_connected():
+            playwright = sync_playwright().start()
+            use_headless = Settings.HEADLESS if headless is None else headless
+            browser = playwright.chromium.launch(
+                headless=use_headless,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                ],
+            )
+            cls._local.playwright = playwright
+            cls._local.browser = browser
             with cls._lock:
-                if cls._browser is None or not cls._browser.is_connected():
-                    cls._playwright = sync_playwright().start()
-                    use_headless = Settings.HEADLESS if headless is None else headless
-                    cls._browser = cls._playwright.chromium.launch(
-                        headless=use_headless,
-                        args=[
-                            "--disable-blink-features=AutomationControlled",
-                            "--no-sandbox",
-                            "--disable-dev-shm-usage",
-                            "--disable-gpu",
-                        ],
-                    )
-        return cls._browser
+                cls._instances.append((playwright, browser))
+        return browser
 
     @classmethod
     def create_context(cls, proxy: str = None, headless: Optional[bool] = None) -> tuple[BrowserContext, Page]:
@@ -77,23 +80,25 @@ class BrowserFactory:
         return context, page
 
     # Legacy alias kept so that the Worker can be swapped without touching
-    # the Executor or its tests.  The Worker now expects a ``(context, page)``
+    # the Executor or its tests. The Worker now expects a ``(context, page)``
     # tuple instead of a bare driver.
     create_driver = create_context
 
     @classmethod
     def shutdown(cls) -> None:
-        """Close the shared browser and stop Playwright."""
+        """Close all browsers and stop Playwright instances across all threads."""
         with cls._lock:
-            if cls._browser:
+            for playwright, browser in cls._instances:
                 try:
-                    cls._browser.close()
+                    if browser and browser.is_connected():
+                        browser.close()
                 except Exception:
                     pass
-                cls._browser = None
-            if cls._playwright:
                 try:
-                    cls._playwright.stop()
+                    if playwright:
+                        playwright.stop()
                 except Exception:
                     pass
-                cls._playwright = None
+            cls._instances.clear()
+            cls._local = threading.local()
+
