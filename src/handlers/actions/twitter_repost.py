@@ -24,7 +24,7 @@ class TwitterRepostHandler(TwitterActionMixin, IActionHandler):
             article.locator('[data-testid="unretweet"]').wait_for(
                 state="visible", timeout=self.timeout
             )
-            print(f"[Twitter] ✅ Reposted {task.target_url}")
+            print(f"[Twitter] TASK_SUCCESS Reposted {task.target_url}")
             return True
         except Exception as exc:
             print(f"[Twitter] Repost error: {str(exc)[:160]}")

@@ -44,6 +44,13 @@ class Worker:
                 authentication = platform_handler.login(page, task.account)
                 if not authentication:
                     last_error = getattr(authentication, "error", None) or "login failed"
+                    print(
+                        f"[Worker] LOGIN_FAILED attempt={attempt} "
+                        f"account={task.account.username} "
+                        f"platform={task.platform.value} "
+                        f"error={last_error[:200]}",
+                        flush=True,
+                    )
                     if attempt <= self.settings.MAX_RETRIES:
                         time.sleep(self.settings.RETRY_DELAY * attempt)
                         continue

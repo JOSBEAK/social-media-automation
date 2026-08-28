@@ -45,7 +45,7 @@ class TwitterHandler(IPlatformHandler):
             page.locator(
                 'a[data-testid="AppTabBar_Home_Link"], a[href="/home"]'
             ).first.wait_for(state="visible", timeout=20000)
-            print("[Twitter] ✅ Login success")
+            print("[Twitter] LOGIN_SUCCESS")
             return True
         except Exception as exc:
             print(f"[Twitter] Login error: {str(exc)[:160]}")

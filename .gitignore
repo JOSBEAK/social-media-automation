@@ -8,3 +8,6 @@ venv/
 accounts.json
 proxies.json
 data/
+debug/
+.env
+*.csv

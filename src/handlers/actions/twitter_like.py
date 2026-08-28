@@ -23,7 +23,7 @@ class TwitterLikeHandler(TwitterActionMixin, IActionHandler):
             article.locator('[data-testid="unlike"]').wait_for(
                 state="visible", timeout=self.timeout
             )
-            print(f"[Twitter] ✅ Liked {task.target_url}")
+            print(f"[Twitter] TASK_SUCCESS Liked {task.target_url}")
             return True
         except Exception as exc:
             print(f"[Twitter] Like error: {str(exc)[:160]}")

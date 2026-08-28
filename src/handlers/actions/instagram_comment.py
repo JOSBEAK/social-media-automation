@@ -47,7 +47,7 @@ class InstagramCommentHandler(InstagramActionMixin, IActionHandler):
             post_btn.click()
             time.sleep(2)
             
-            print(f"[Instagram] ✅ Commented: '{comment_text[:30]}...'")
+            print(f"[Instagram] TASK_SUCCESS Commented: '{comment_text[:30].encode('ascii', 'replace').decode()}...'")
             return True
         except Exception as e:
             print(f"[Instagram] Comment error: {str(e)[:100]}")

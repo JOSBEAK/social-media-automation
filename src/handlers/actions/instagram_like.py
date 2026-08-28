@@ -35,20 +35,43 @@ class InstagramLikeHandler(InstagramActionMixin, IActionHandler):
             if session_failure:
                 return session_failure
 
-            # Check if already liked
-            unlike = page.locator('svg[aria-label="Unlike"]')
-            if unlike.count() > 0:
-                print(f"[Instagram] Already liked {task.target_url}")
+            # Target post action bar specifically via Share/Save/Comment SVG ancestor section
+            try:
+                anchor_svg = page.locator(
+                    'svg[aria-label="Share"], svg[aria-label="Save"], svg[aria-label="Comment"]'
+                ).first
+                anchor_svg.wait_for(state="visible", timeout=5000)
+                action_bar = anchor_svg.locator('xpath=ancestor::section[1]').first
+
+                # Check if post is already liked
+                if action_bar.locator('svg[aria-label="Unlike"]').count() > 0:
+                    print(f"[Instagram] Already liked {task.target_url}")
+                    return ActionResult(True)
+
+                # Locate Like button inside post action bar
+                like_btn = action_bar.locator(
+                    'div[role="button"]:has(svg[aria-label="Like"]), span:has(svg[aria-label="Like"]), svg[aria-label="Like"]'
+                ).first
+                like_btn.click()
+                
+                # Confirm Unlike state appears in action bar
+                action_bar.locator('svg[aria-label="Unlike"]').first.wait_for(
+                    state="visible", timeout=5000
+                )
+                print(f"[Instagram] TASK_SUCCESS Liked {task.target_url}")
                 return ActionResult(True)
-            
-            # Primary approach: find the Like SVG and click its button ancestor
+            except PlaywrightTimeout:
+                pass
+            except Exception as exc:
+                print(f"[Instagram] Action bar like attempt failed: {exc}")
+
+            # Fallback approach: find any Like SVG button ancestor
             try:
                 like_svg = page.locator('svg[aria-label="Like"]').first
                 like_svg.wait_for(state="visible", timeout=3000)
-                # Click the parent button/div
                 like_btn = like_svg.locator("xpath=ancestor::div[@role='button'] | ancestor::button").first
                 like_btn.click(force=True)
-                return self._confirmed_result(page, task, "SVG parent")
+                return self._confirmed_result(page, task, "SVG parent fallback")
             except PlaywrightTimeout:
                 pass
 
@@ -62,11 +85,11 @@ class InstagramLikeHandler(InstagramActionMixin, IActionHandler):
                     continue
 
             # JavaScript fallback
-            clicked = page.evaluate("""
+            clicked = page.evaluate("""() => {
                 const element = document.querySelector('[aria-label="Like"]');
                 if (element) { element.click(); return true; }
                 return false;
-            """)
+            }""")
             if not clicked:
                 print("[Instagram] Like button not found")
                 return ActionResult(False, "Instagram like button was not found on the target post")
@@ -82,7 +105,7 @@ class InstagramLikeHandler(InstagramActionMixin, IActionHandler):
             page.locator('svg[aria-label="Unlike"]').first.wait_for(
                 state="visible", timeout=5000
             )
-            print(f"[Instagram] ✅ Liked {task.target_url} via {method}")
+            print(f"[Instagram] TASK_SUCCESS Liked {task.target_url} via {method}")
             return ActionResult(True)
         except PlaywrightTimeout:
             return ActionResult(

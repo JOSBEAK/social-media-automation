@@ -30,7 +30,7 @@ class TwitterCommentHandler(TwitterActionMixin, IActionHandler):
             page.locator('[data-testid="tweetButton"]').wait_for(
                 state="hidden", timeout=self.timeout
             )
-            print(f"[Twitter] ✅ Replied: '{comment[:30]}...' ")
+            print(f"[Twitter] TASK_SUCCESS Replied: '{comment[:30].encode('ascii', 'replace').decode()}...' ")
             return True
         except Exception as exc:
             print(f"[Twitter] Reply error: {str(exc)[:160]}")

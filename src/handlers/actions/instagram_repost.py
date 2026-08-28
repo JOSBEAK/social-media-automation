@@ -38,7 +38,7 @@ class InstagramRepostHandler(InstagramActionMixin, IActionHandler):
             repost_opt.first.click()
             time.sleep(2)
             
-            print(f"[Instagram] ✅ Reposted {task.target_url}")
+            print(f"[Instagram] TASK_SUCCESS Reposted {task.target_url}")
             return True
         except Exception as e:
             print(f"[Instagram] Repost error: {str(e)[:100]}")
