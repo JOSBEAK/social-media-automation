@@ -19,7 +19,8 @@ class Settings:
     MIN_COOLDOWN = max(0.0, float(os.getenv("SOCIAL_MIN_COOLDOWN", "0")))
     MAX_COOLDOWN = max(MIN_COOLDOWN, float(os.getenv("SOCIAL_MAX_COOLDOWN", "0")))
     HEADLESS = _env_bool("SOCIAL_HEADLESS", False)
-    IMPLICIT_WAIT = max(0.0, float(os.getenv("SOCIAL_IMPLICIT_WAIT", "10")))
+    # Playwright default timeout in seconds (converted to ms inside BrowserFactory).
+    DEFAULT_TIMEOUT = max(0.0, float(os.getenv("SOCIAL_DEFAULT_TIMEOUT", "30")))
     LOGIN_TYPING_MIN = max(0.0, float(os.getenv("SOCIAL_LOGIN_TYPING_MIN", "0.05")))
     LOGIN_TYPING_MAX = max(
         LOGIN_TYPING_MIN, float(os.getenv("SOCIAL_LOGIN_TYPING_MAX", "0.15"))

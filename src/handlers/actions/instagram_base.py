@@ -3,9 +3,10 @@ from src.domains.action_result import ActionResult
 
 class InstagramActionMixin:
     @staticmethod
-    def session_error(driver) -> str | None:
+    def session_error(page) -> str | None:
         try:
-            session_cookie = driver.get_cookie("sessionid")
+            cookies = page.context.cookies("https://www.instagram.com")
+            session_cookie = next((c for c in cookies if c["name"] == "sessionid"), None)
         except Exception as exc:
             return f"Could not inspect Instagram session cookie: {type(exc).__name__}: {exc}"
         if not session_cookie or not session_cookie.get("value"):
@@ -16,8 +17,8 @@ class InstagramActionMixin:
         return None
 
     @classmethod
-    def require_session(cls, driver) -> ActionResult | None:
-        error = cls.session_error(driver)
+    def require_session(cls, page) -> ActionResult | None:
+        error = cls.session_error(page)
         if error:
             print(f"[InstagramSession] {error}", flush=True)
             return ActionResult(False, error)

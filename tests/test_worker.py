@@ -17,7 +17,7 @@ class FakePlatform:
         self.login_results = iter(login_results)
         self.calls = 0
 
-    def login(self, driver, account):
+    def login(self, page, account):
         self.calls += 1
         return next(self.login_results)
 
@@ -30,27 +30,32 @@ class FakeAction:
         self.result = result
         self.calls = 0
 
-    def execute(self, driver, task):
+    def execute(self, page, task):
         self.calls += 1
         return self.result
 
 
-class FakeDriver:
-    def __init__(self):
-        self.quit_called = False
+class FakePage:
+    pass
 
-    def quit(self):
-        self.quit_called = True
+
+class FakeContext:
+    def __init__(self):
+        self.close_called = False
+
+    def close(self):
+        self.close_called = True
 
 
 class FakeBrowserFactory:
-    drivers = []
+    contexts = []
 
     @classmethod
-    def create_driver(cls, proxy=None):
-        driver = FakeDriver()
-        cls.drivers.append(driver)
-        return driver
+    def create_context(cls, proxy=None):
+        context = FakeContext()
+        page = FakePage()
+        cls.contexts.append(context)
+        return context, page
 
 
 class FakeProxyManager:
@@ -74,7 +79,7 @@ def make_task():
 
 class WorkerTests(unittest.TestCase):
     def setUp(self):
-        FakeBrowserFactory.drivers = []
+        FakeBrowserFactory.contexts = []
 
     def make_worker(self, platform, action):
         registry = Registry()
@@ -87,7 +92,7 @@ class WorkerTests(unittest.TestCase):
             settings=RetrySettings,
         )
 
-    def test_retries_login_and_closes_every_driver(self):
+    def test_retries_login_and_closes_every_context(self):
         platform = FakePlatform([False, True])
         action = FakeAction(True)
         result = self.make_worker(platform, action).execute(make_task())
@@ -95,7 +100,7 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(result.code, ResultCode.SUCCESS)
         self.assertEqual(result.attempts, 2)
         self.assertEqual(platform.calls, 2)
-        self.assertTrue(all(driver.quit_called for driver in FakeBrowserFactory.drivers))
+        self.assertTrue(all(ctx.close_called for ctx in FakeBrowserFactory.contexts))
 
     def test_does_not_blindly_retry_failed_write(self):
         platform = FakePlatform([True])
@@ -104,7 +109,7 @@ class WorkerTests(unittest.TestCase):
 
         self.assertEqual(result.code, ResultCode.ACTION_FAILED)
         self.assertEqual(action.calls, 1)
-        self.assertEqual(len(FakeBrowserFactory.drivers), 1)
+        self.assertEqual(len(FakeBrowserFactory.contexts), 1)
 
     def test_preserves_structured_action_failure_reason(self):
         platform = FakePlatform([True])
