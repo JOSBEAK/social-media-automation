@@ -36,18 +36,27 @@ class Worker:
 
         last_error = None
         for attempt in range(1, self.settings.MAX_RETRIES + 2):
-            driver = None
+            context = None
             try:
-                driver = self.browser_factory.create_driver(proxy=self.proxy_manager.get_next())
-                authentication = platform_handler.login(driver, task.account)
+                context, page = self.browser_factory.create_context(
+                    proxy=self.proxy_manager.get_next()
+                )
+                authentication = platform_handler.login(page, task.account)
                 if not authentication:
                     last_error = getattr(authentication, "error", None) or "login failed"
+                    print(
+                        f"[Worker] LOGIN_FAILED attempt={attempt} "
+                        f"account={task.account.username} "
+                        f"platform={task.platform.value} "
+                        f"error={last_error[:200]}",
+                        flush=True,
+                    )
                     if attempt <= self.settings.MAX_RETRIES:
                         time.sleep(self.settings.RETRY_DELAY * attempt)
                         continue
                     return ExecutionResult(task, ResultCode.LOGIN_FAILED, attempt, last_error)
 
-                action_execution = action_handler.execute(driver, task)
+                action_execution = action_handler.execute(page, task)
                 if action_execution:
                     return ExecutionResult(task, ResultCode.SUCCESS, attempt)
 
@@ -62,9 +71,9 @@ class Worker:
                     continue
                 return ExecutionResult(task, ResultCode.INTERNAL_ERROR, attempt, last_error)
             finally:
-                if driver:
+                if context:
                     try:
-                        driver.quit()
+                        context.close()
                     except Exception:
                         pass
 

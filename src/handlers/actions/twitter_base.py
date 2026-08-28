@@ -1,32 +1,25 @@
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
-
-
 class TwitterActionMixin:
-    timeout = 15
+    timeout = 15000  # milliseconds for Playwright
 
-    def _wait_for_test_id(self, driver, *test_ids: str):
+    def _wait_for_test_id(self, page, *test_ids: str):
         selector = ", ".join(f'[data-testid="{test_id}"]' for test_id in test_ids)
-        return WebDriverWait(driver, self.timeout).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, selector))
-        )
+        locator = page.locator(selector).first
+        locator.wait_for(state="visible", timeout=self.timeout)
+        return locator
 
-    def _click_test_id(self, driver, test_id: str):
-        element = WebDriverWait(driver, self.timeout).until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, f'[data-testid="{test_id}"]'))
-        )
-        driver.execute_script("arguments[0].click();", element)
-        return element
+    def _click_test_id(self, page, test_id: str):
+        locator = page.locator(f'[data-testid="{test_id}"]')
+        locator.click(force=True, timeout=self.timeout)
+        return locator
 
-    def _open_post(self, driver, url: str):
-        driver.get(url)
-        return WebDriverWait(driver, self.timeout).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, 'article[data-testid="tweet"]'))
-        )
+    def _open_post(self, page, url: str):
+        page.goto(url, wait_until="domcontentloaded")
+        article = page.locator('article[data-testid="tweet"]').first
+        article.wait_for(state="visible", timeout=self.timeout)
+        return article
 
     def _post_control(self, article, *test_ids: str):
         selector = ", ".join(f'[data-testid="{test_id}"]' for test_id in test_ids)
-        return WebDriverWait(article.parent, self.timeout).until(
-            lambda _driver: next(iter(article.find_elements(By.CSS_SELECTOR, selector)), False)
-        )
+        locator = article.locator(selector).first
+        locator.wait_for(state="visible", timeout=self.timeout)
+        return locator

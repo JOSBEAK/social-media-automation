@@ -1,36 +1,38 @@
-import os
-import tempfile
 import unittest
-from pathlib import Path
 
 from src.services.browser_factory import BrowserFactory
 
 
 class BrowserFactoryTests(unittest.TestCase):
-    def test_resolves_real_driver_when_manager_returns_notice_file(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            folder = Path(temp_dir)
-            notice = folder / "THIRD_PARTY_NOTICES.chromedriver"
-            driver = folder / ("chromedriver.exe" if os.name == "nt" else "chromedriver")
-            notice.write_text("not an executable driver", encoding="utf-8")
-            driver.write_bytes(b"driver")
+    def test_browser_factory_has_create_context(self):
+        """Verify the Playwright BrowserFactory exposes the expected API."""
+        self.assertTrue(hasattr(BrowserFactory, "create_context"))
+        self.assertTrue(hasattr(BrowserFactory, "create_driver"))  # legacy alias
+        self.assertTrue(hasattr(BrowserFactory, "shutdown"))
 
-            resolved = BrowserFactory._resolve_managed_driver_path(str(notice))
+    def test_create_context_alias_matches_create_context(self):
+        self.assertEqual(
+            BrowserFactory.create_driver.__func__,
+            BrowserFactory.create_context.__func__,
+        )
 
-            self.assertEqual(Path(resolved), driver)
-            if os.name != "nt":
-                self.assertTrue(os.access(driver, os.X_OK))
 
-    def test_finds_cached_driver_without_network_lookup(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            folder = Path(temp_dir) / "151" / "driver-package"
-            folder.mkdir(parents=True)
-            driver = folder / ("chromedriver.exe" if os.name == "nt" else "chromedriver")
-            driver.write_bytes(b"driver")
+    def test_multithreaded_context_creation(self):
+        """Verify contexts can be created and closed across multiple concurrent threads."""
+        import concurrent.futures
 
-            resolved = BrowserFactory._find_cached_driver(Path(temp_dir))
+        def worker_fn():
+            context, page = BrowserFactory.create_context(headless=True)
+            page.goto("about:blank")
+            context.close()
+            return True
 
-            self.assertEqual(Path(resolved), driver)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+            futures = [pool.submit(worker_fn) for _ in range(3)]
+            results = [f.result() for f in futures]
+            self.assertTrue(all(results))
+
+        BrowserFactory.shutdown()
 
 
 if __name__ == "__main__":

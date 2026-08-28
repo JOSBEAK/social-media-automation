@@ -1,7 +1,4 @@
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
+from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
 from src.domains.platform import Platform
 from src.interfaces.i_platform_handler import IPlatformHandler
@@ -22,52 +19,33 @@ class TwitterHandler(IPlatformHandler):
             return f"https://x.com/{identifier}"
         raise ValueError("X post identifiers must include '<username>/status/<post_id>'")
 
-    def login(self, driver, account) -> bool:
-        wait = WebDriverWait(driver, 20)
+    def login(self, page, account) -> bool:
         try:
-            driver.get(self.LOGIN_URL)
-            username = wait.until(
-                EC.visibility_of_element_located(
-                    (By.CSS_SELECTOR, 'input[autocomplete="username"]')
-                )
-            )
-            username.send_keys(account.username)
-            wait.until(
-                EC.element_to_be_clickable((By.XPATH, '//button[.//span[text()="Next"]]'))
-            ).click()
+            page.goto(self.LOGIN_URL, wait_until="domcontentloaded")
+            username = page.locator('input[autocomplete="username"]')
+            username.wait_for(state="visible", timeout=20000)
+            username.fill(account.username)
+            page.locator('button:has(span:text("Next"))').click()
 
             try:
-                password = WebDriverWait(driver, 8).until(
-                    EC.visibility_of_element_located((By.CSS_SELECTOR, 'input[name="password"]'))
-                )
-            except TimeoutException:
-                challenge = wait.until(
-                    EC.visibility_of_element_located(
-                        (By.CSS_SELECTOR, 'input[data-testid="ocfEnterTextTextInput"]')
-                    )
-                )
+                password = page.locator('input[name="password"]')
+                password.wait_for(state="visible", timeout=8000)
+            except PlaywrightTimeout:
+                challenge = page.locator('input[data-testid="ocfEnterTextTextInput"]')
+                challenge.wait_for(state="visible", timeout=20000)
                 identifier = account.verification_identifier or account.username
-                challenge.send_keys(identifier)
-                wait.until(
-                    EC.element_to_be_clickable((By.XPATH, '//button[.//span[text()="Next"]]'))
-                ).click()
-                password = wait.until(
-                    EC.visibility_of_element_located((By.CSS_SELECTOR, 'input[name="password"]'))
-                )
+                challenge.fill(identifier)
+                page.locator('button:has(span:text("Next"))').click()
+                password = page.locator('input[name="password"]')
+                password.wait_for(state="visible", timeout=20000)
 
-            password.send_keys(account.password)
-            wait.until(
-                EC.element_to_be_clickable(
-                    (By.CSS_SELECTOR, 'button[data-testid="LoginForm_Login_Button"]')
-                )
-            ).click()
-            wait.until(
-                EC.any_of(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, 'a[data-testid="AppTabBar_Home_Link"]')),
-                    EC.presence_of_element_located((By.CSS_SELECTOR, 'a[href="/home"]')),
-                )
-            )
-            print("[Twitter] ✅ Login success")
+            password.fill(account.password)
+            page.locator('button[data-testid="LoginForm_Login_Button"]').click()
+            # Wait for home page indicator
+            page.locator(
+                'a[data-testid="AppTabBar_Home_Link"], a[href="/home"]'
+            ).first.wait_for(state="visible", timeout=20000)
+            print("[Twitter] LOGIN_SUCCESS")
             return True
         except Exception as exc:
             print(f"[Twitter] Login error: {str(exc)[:160]}")

@@ -1,5 +1,3 @@
-from selenium.webdriver.support.ui import WebDriverWait
-
 from src.domains.action_type import ActionType
 from src.domains.platform import Platform
 from src.handlers.actions.twitter_base import TwitterActionMixin
@@ -15,18 +13,18 @@ class TwitterRepostHandler(TwitterActionMixin, IActionHandler):
     def action_type(self) -> ActionType:
         return ActionType.REPOST
 
-    def execute(self, driver, task) -> bool:
+    def execute(self, page, task) -> bool:
         try:
-            article = self._open_post(driver, task.target_url)
+            article = self._open_post(page, task.target_url)
             button = self._post_control(article, "retweet", "unretweet")
             if button.get_attribute("data-testid") == "unretweet":
                 return True
-            driver.execute_script("arguments[0].click();", button)
-            self._click_test_id(driver, "retweetConfirm")
-            WebDriverWait(driver, self.timeout).until(
-                lambda _driver: article.find_elements("css selector", '[data-testid="unretweet"]')
+            button.click(force=True)
+            self._click_test_id(page, "retweetConfirm")
+            article.locator('[data-testid="unretweet"]').wait_for(
+                state="visible", timeout=self.timeout
             )
-            print(f"[Twitter] ✅ Reposted {task.target_url}")
+            print(f"[Twitter] TASK_SUCCESS Reposted {task.target_url}")
             return True
         except Exception as exc:
             print(f"[Twitter] Repost error: {str(exc)[:160]}")

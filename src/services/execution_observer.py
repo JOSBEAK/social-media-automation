@@ -12,7 +12,7 @@ class ConsoleExecutionObserver:
         return None
 
     def on_result(self, result: ExecutionResult, completed: int, total: int) -> None:
-        marker = "✅" if result.success else "❌"
+        marker = "TASK_SUCCESS" if result.success else "TASK_FAILED"
         detail = f" ({result.error.splitlines()[-1][:100]})" if result.error else ""
         print(
             f"[Executor] Progress: {completed}/{total} | {marker} "
@@ -29,7 +29,7 @@ class ConsoleExecutionObserver:
 
     def on_completed(self, summary: ExecutionSummary) -> None:
         print("\n" + "=" * 60)
-        print("✅ EXECUTION COMPLETE!")
+        print("EXECUTION_COMPLETE")
         print(f"   Total: {len(summary.results)}")
         print(f"   Success: {summary.succeeded}")
         print(f"   Failed: {summary.failed}")

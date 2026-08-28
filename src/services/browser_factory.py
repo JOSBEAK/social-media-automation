@@ -1,104 +1,104 @@
 # src/services/browser_factory.py
-import os
-import stat
 import threading
-from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Tuple
 
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
+from playwright.sync_api import sync_playwright, Playwright, Browser, BrowserContext, Page
 
 from src.config.settings import Settings
 
+
 class BrowserFactory:
-    _driver_path: Optional[str] = None
-    _install_lock = threading.Lock()
+    """Manages thread-local Playwright instances and Chromium browsers.
+
+    Each worker thread maintains its own thread-local Playwright and Browser instance,
+    ensuring thread-safety and preventing greenlet thread-switch errors in multi-threaded
+    executors.
+
+    Each call to ``create_context`` returns an isolated ``BrowserContext`` with
+    its own cookies, storage, and a single ``Page``. Workers must close the
+    context when finished (the ``Worker`` does this in its ``finally`` block).
+    """
+
+    _local = threading.local()
+    _instances: List[Tuple[Playwright, Browser]] = []
+    _lock = threading.Lock()
 
     @classmethod
-    def _get_driver_path(cls) -> str:
-        configured_path = os.getenv("CHROMEDRIVER_PATH")
-        if configured_path:
-            if not Path(configured_path).is_file():
-                raise FileNotFoundError(f"CHROMEDRIVER_PATH is not a file: {configured_path}")
-            return configured_path
-
-        if cls._driver_path is None:
-            with cls._install_lock:
-                if cls._driver_path is None:
-                    cached_path = cls._find_cached_driver()
-                    if cached_path:
-                        cls._driver_path = cached_path
-                    else:
-                        installed_path = ChromeDriverManager().install()
-                        cls._driver_path = cls._resolve_managed_driver_path(installed_path)
-        return cls._driver_path
-
-    @classmethod
-    def _find_cached_driver(cls, cache_root: Path | None = None) -> str | None:
-        root = cache_root or (Path.home() / ".wdm" / "drivers" / "chromedriver")
-        if not root.exists():
-            return None
-        driver_names = {"chromedriver", "chromedriver.exe"}
-        candidates = [
-            path
-            for path in root.rglob("chromedriver*")
-            if path.is_file() and path.name.lower() in driver_names
-        ]
-        if not candidates:
-            return None
-        newest = max(candidates, key=lambda path: path.stat().st_mtime)
-        return cls._resolve_managed_driver_path(str(newest))
-
-    @staticmethod
-    def _resolve_managed_driver_path(installed_path: str) -> str:
-        """Work around webdriver-manager returning a notice/license file."""
-        installed = Path(installed_path)
-        driver_names = {"chromedriver", "chromedriver.exe"}
-        if installed.is_file() and installed.name.lower() in driver_names:
-            candidate = installed
-        else:
-            candidates = sorted(
-                (
-                    path
-                    for path in installed.parent.rglob("chromedriver*")
-                    if path.is_file() and path.name.lower() in driver_names
-                ),
-                key=lambda path: (len(path.parts), str(path)),
+    def _ensure_browser(cls, headless: Optional[bool] = None) -> Browser:
+        browser = getattr(cls._local, "browser", None)
+        if browser is None or not browser.is_connected():
+            playwright = sync_playwright().start()
+            use_headless = Settings.HEADLESS if headless is None else headless
+            browser = playwright.chromium.launch(
+                headless=use_headless,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                ],
             )
-            if not candidates:
-                raise FileNotFoundError(
-                    f"webdriver-manager did not provide a ChromeDriver binary near {installed_path}"
-                )
-            candidate = candidates[0]
-
-        if os.name != "nt" and not os.access(candidate, os.X_OK):
-            candidate.chmod(candidate.stat().st_mode | stat.S_IXUSR)
-        return str(candidate)
+            cls._local.playwright = playwright
+            cls._local.browser = browser
+            with cls._lock:
+                cls._instances.append((playwright, browser))
+        return browser
 
     @classmethod
-    def create_driver(cls, proxy: str = None, headless: Optional[bool] = None):
-        options = Options()
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option("useAutomationExtension", False)
-        options.add_experimental_option("detach", True)
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--window-size=1920,1080")
+    def create_context(cls, proxy: str = None, headless: Optional[bool] = None) -> tuple[BrowserContext, Page]:
+        """Create an isolated BrowserContext and a Page within it.
+
+        Returns ``(context, page)`` so the caller can close the context when
+        done and still have direct page access for navigation.
+        """
+        browser = cls._ensure_browser(headless)
+
+        context_kwargs = {
+            "viewport": {"width": 1920, "height": 1080},
+            "user_agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/131.0.0.0 Safari/537.36"
+            ),
+        }
 
         if proxy:
             if "://" not in proxy:
                 proxy = f"http://{proxy}"
-            options.add_argument(f"--proxy-server={proxy}")
-        if Settings.HEADLESS if headless is None else headless:
-            options.add_argument("--headless=new")
+            context_kwargs["proxy"] = {"server": proxy}
 
-        driver = webdriver.Chrome(service=Service(cls._get_driver_path()), options=options)
-        driver.execute_script(
+        context = browser.new_context(**context_kwargs)
+
+        # Mask the navigator.webdriver flag the same way the old Selenium code did.
+        context.add_init_script(
             "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
         )
-        driver.implicitly_wait(Settings.IMPLICIT_WAIT)
-        return driver
+
+        page = context.new_page()
+        page.set_default_timeout(Settings.DEFAULT_TIMEOUT * 1000)
+
+        return context, page
+
+    # Legacy alias kept so that the Worker can be swapped without touching
+    # the Executor or its tests. The Worker now expects a ``(context, page)``
+    # tuple instead of a bare driver.
+    create_driver = create_context
+
+    @classmethod
+    def shutdown(cls) -> None:
+        """Close all browsers and stop Playwright instances across all threads."""
+        with cls._lock:
+            for playwright, browser in cls._instances:
+                try:
+                    if browser and browser.is_connected():
+                        browser.close()
+                except Exception:
+                    pass
+                try:
+                    if playwright:
+                        playwright.stop()
+                except Exception:
+                    pass
+            cls._instances.clear()
+            cls._local = threading.local()
+
